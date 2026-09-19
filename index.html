@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Signature électronique</title>
+<style>
+:root {
+  --ink:#111827;
+  --muted:#667085;
+  --line:#e5e7eb;
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --accent:#2563eb;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0; min-height:100vh; background:var(--bg);
+  font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:var(--ink); display:flex; justify-content:center; padding:28px 16px;
+}
+.app { width:min(920px,100%); }
+.header { margin-bottom:18px; }
+.badge {
+  display:inline-flex; align-items:center; gap:7px; padding:7px 11px;
+  border-radius:999px; background:#eaf2ff; color:#1d4ed8;
+  font-size:12px; font-weight:700; letter-spacing:.02em;
+}
+.badge span { width:7px;height:7px;border-radius:50%;background:#2563eb; }
+h1 { margin:13px 0 6px; font-size:clamp(27px,5vw,38px); letter-spacing:-.03em; }
+.subtitle { margin:0; color:var(--muted); font-size:15px; }
+.card {
+  background:var(--card); border:1px solid var(--line); border-radius:22px;
+  box-shadow:0 18px 55px rgba(16,24,40,.08); overflow:hidden;
+}
+.topbar {
+  display:flex; justify-content:space-between; align-items:center; gap:14px;
+  padding:18px 20px; border-bottom:1px solid var(--line);
+}
+.step { font-size:14px; font-weight:700; }
+.secure { color:#667085; font-size:13px; display:flex; gap:7px; align-items:center; }
+.panel { padding:20px; }
+.label { font-size:13px; font-weight:700; margin-bottom:9px; }
+.sign-box {
+  position:relative; height:310px; border:1px solid #d8dde5; border-radius:16px;
+  background:#fff; overflow:hidden; touch-action:none;
+  box-shadow:inset 0 1px 2px rgba(16,24,40,.03);
+}
+.sign-box::before {
+  content:""; position:absolute; left:34px; right:34px; bottom:64px;
+  height:1px; background:#d9dee7; pointer-events:none;
+}
+.sign-box::after {
+  content:"Signature"; position:absolute; left:34px; bottom:38px;
+  font-size:11px; color:#a0a8b5; pointer-events:none;
+}
+canvas { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+.hint {
+  margin-top:9px; color:#8a93a1; font-size:12px; display:flex; justify-content:space-between;
+}
+.controls {
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  margin-top:18px; padding-top:18px; border-top:1px solid var(--line);
+}
+.left, .right { display:flex; gap:9px; align-items:center; }
+button {
+  border:0; font:inherit; font-weight:700; border-radius:11px; padding:12px 16px;
+  cursor:pointer; transition:.15s transform,.15s background;
+}
+button:active { transform:scale(.98); }
+.secondary { background:#f2f4f7; color:#344054; }
+.primary { background:var(--ink); color:white; min-width:150px; }
+.primary:hover { background:#273142; }
+.secondary:hover { background:#e9ecf1; }
+.status { min-height:20px; margin-top:11px; font-size:12px; color:#667085; }
+.preview {
+  display:none; margin-top:18px; padding:16px; border:1px solid #dfe3e8;
+  border-radius:15px; background:#fafbfc;
+}
+.preview.active { display:block; }
+.preview-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.preview-title { font-weight:700; font-size:13px; }
+.preview img { max-width:100%; max-height:130px; display:block; margin:auto; }
+.footer { text-align:center; color:#98a2b3; font-size:11px; margin-top:15px; }
+
+@media (max-width:600px) {
+  body { padding:15px 10px; }
+  .card { border-radius:18px; }
+  .topbar,.panel { padding:15px; }
+  .sign-box { height:255px; }
+  .controls { flex-direction:column; align-items:stretch; }
+  .left,.right { width:100%; }
+  .left button,.right button { flex:1; }
+  .primary { width:100%; }
+  .secure { display:none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="badge"><span></span> Signature électronique</div>
+    <h1>Signez votre document</h1>
+    <p class="subtitle">Tracez votre signature directement avec votre doigt, votre stylet ou votre souris.</p>
+  </div>
+
+  <section class="card">
+    <div class="topbar">
+      <div class="step">Étape 1 sur 1 · Votre signature</div>
+      <div class="secure">🔒 Signature locale et privée</div>
+    </div>
+
+    <div class="panel">
+      <div class="label">Zone de signature</div>
+      <div class="sign-box" id="signBox">
+        <canvas id="canvas"></canvas>
+      </div>
+      <div class="hint">
+        <span>Écrivez naturellement, comme sur papier.</span>
+        <span id="count">0 trait</span>
+      </div>
+
+      <div class="controls">
+        <div class="left">
+          <button class="secondary" id="clear">↺ Effacer</button>
+        </div>
+        <div class="right">
+          <button class="primary" id="save">✓ Valider et enregistrer</button>
+        </div>
+      </div>
+
+      <div class="status" id="status">Aucune signature saisie.</div>
+
+      <div class="preview" id="preview">
+        <div class="preview-head">
+          <div class="preview-title">Aperçu de votre signature</div>
+          <button class="secondary" id="downloadAgain">Télécharger</button>
+        </div>
+        <img id="previewImg" alt="Aperçu de la signature">
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">Votre signature est dessinée directement dans votre navigateur.</div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const box = document.getElementById("signBox");
+const ctx = canvas.getContext("2d");
+const status = document.getElementById("status");
+const count = document.getElementById("count");
+const preview = document.getElementById("preview");
+const previewImg = document.getElementById("previewImg");
+
+let drawing = false;
+let strokes = 0;
+let hasSignature = false;
+let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+function setupCanvas() {
+  const rect = box.getBoundingClientRect();
+  dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  canvas.style.width = rect.width + "px";
+  canvas.style.height = rect.height + "px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#111827";
+  ctx.lineWidth = 2.6;
+}
+
+function pos(e) {
+  const r = canvas.getBoundingClientRect();
+  return {x:e.clientX-r.left, y:e.clientY-r.top};
+}
+
+canvas.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  drawing = true;
+  canvas.setPointerCapture(e.pointerId);
+  const p = pos(e);
+  ctx.beginPath();
+  ctx.moveTo(p.x,p.y);
+  strokes++;
+  hasSignature = true;
+  count.textContent = strokes + (strokes > 1 ? " traits" : " trait");
+  status.textContent = "Signature en cours…";
+});
+
+canvas.addEventListener("pointermove", e => {
+  if (!drawing) return;
+  e.preventDefault();
+  const p = pos(e);
+  ctx.lineTo(p.x,p.y);
+  ctx.stroke();
+});
+
+function stop(e) {
+  if (!drawing) return;
+  drawing = false;
+  ctx.closePath();
+  status.textContent = "Signature prête à être validée.";
+}
+
+canvas.addEventListener("pointerup", stop);
+canvas.addEventListener("pointercancel", stop);
+
+function clearSignature() {
+  const r = canvas.getBoundingClientRect();
+  ctx.clearRect(0,0,r.width,r.height);
+  strokes = 0;
+  hasSignature = false;
+  count.textContent = "0 trait";
+  status.textContent = "Aucune signature saisie.";
+  preview.classList.remove("active");
+}
+
+function exportSignature() {
+  if (!hasSignature) {
+    status.textContent = "Veuillez d’abord dessiner votre signature.";
+    return null;
+  }
+
+  // Recadre la signature autour des pixels dessinés.
+  const w = canvas.width, h = canvas.height;
+  const data = ctx.getImageData(0,0,w,h).data;
+  let minX=w, minY=h, maxX=0, maxY=0, found=false;
+
+  for (let y=0;y<h;y++) {
+    for (let x=0;x<w;x++) {
+      if (data[(y*w+x)*4+3] > 15) {
+        found=true;
+        if(x<minX)minX=x; if(x>maxX)maxX=x;
+        if(y<minY)minY=y; if(y>maxY)maxY=y;
+      }
+    }
+  }
+  if (!found) return null;
+
+  const pad = Math.round(22*dpr);
+  minX=Math.max(0,minX-pad); minY=Math.max(0,minY-pad);
+  maxX=Math.min(w-1,maxX+pad); maxY=Math.min(h-1,maxY+pad);
+
+  const out=document.createElement("canvas");
+  out.width=maxX-minX+1; out.height=maxY-minY+1;
+  out.getContext("2d").drawImage(canvas,minX,minY,out.width,out.height,0,0,out.width,out.height);
+  return out.toDataURL("image/png");
+}
+
+function save() {
+  const data = exportSignature();
+  if (!data) {
+    status.textContent = "Veuillez d’abord dessiner votre signature.";
+    return;
+  }
+  previewImg.src=data;
+  preview.classList.add("active");
+  status.textContent = "Signature validée. Vous pouvez maintenant la télécharger.";
+  download(data);
+}
+
+function download(data) {
+  const a=document.createElement("a");
+  a.href=data;
+  a.download="signature-electronique.png";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+document.getElementById("clear").addEventListener("click", clearSignature);
+document.getElementById("save").addEventListener("click", save);
+document.getElementById("downloadAgain").addEventListener("click", () => {
+  if (previewImg.src) download(previewImg.src);
+});
+
+setupCanvas();
+</script>
+</body>
+</html>
